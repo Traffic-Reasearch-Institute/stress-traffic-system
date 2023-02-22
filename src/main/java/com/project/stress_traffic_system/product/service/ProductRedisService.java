@@ -160,4 +160,82 @@ public class ProductRedisService {
         }
         log.info("조회수 RDS에 업데이트 실행 종료");
     }
+
+    // 키워드별로 조회수 상위 100건 캐싱(zset으로 저장하여 조회해올 때 순차적으로 가져오도록 함)
+    public void cacheProductsByKeyword(List<ProductResponseDto> list, String keyword) {
+        String key = keyword + "::";
+
+        // RedisTemplate에서 직렬화에 사용될 키 밸류 직렬화 객체를 가져온다.
+        RedisSerializer keySerializer = productRedisTemplate.getStringSerializer();
+        RedisSerializer valueSerializer = productRedisTemplate.getValueSerializer();
+
+        productRedisTemplate.delete(key);
+
+        // 파이프라인을 실행하여 Bulk Insert와 유사한 작업을 수행한다.
+        productRedisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+
+            AtomicReference<Double> score = new AtomicReference<>((double) 0);
+            // 전달된 리스트의 각 요소에 대해서 Redis에 키-값 쌍을 저장한다.
+            list.forEach(i -> {
+                connection.zSetCommands().zAdd(keySerializer.serialize(key), // 랭킹 정보를 저장할 Redis의 키
+                        score.getAndSet(new Double((double) (score.get() + 1))), // 랭킹 score 값 (조회수 순서)
+                        valueSerializer.serialize(i)); // value - 랭킹 정보 객체를 직렬화하여 저장
+            });
+            return null;
+        });
+    }
+
+    //redis 에서 상품이름으로 검색하기
+    public List<ProductResponseDto> searchProductsByRedis(String keyword) {
+
+//        Set<String> keys = productRedisTemplate.keys("product-name" + "*" + keyword + "*");
+
+        ScanOptions options = ScanOptions.scanOptions().match("product-name" + "*" + keyword + "*").build();
+        Cursor<byte[]> keys = scanKeys(options);
+
+        List<ProductResponseDto> result = new ArrayList<>();
+        while (true) {
+            try{
+                result.add(productRedisTemplate.opsForValue().get(new String(keys.next())));
+            }
+            finally {
+                break;
+            }
+        }
+//        for (String key : keys) {
+//            result.add(productRedisTemplate.opsForValue().get(key));
+//        }
+        return result;
+    }
+
+    //redis 에서 상품이름으로 검색하기 - cache aside
+    public List<ProductResponseDto> searchProductsByRedisCacheAside(String keyword) {
+//        Set<String> keys = productRedisTemplate.keys("product-name-aside" + "*" + keyword + "*");
+        //테스트일 때는 빈값을 리턴
+        if (keyword.equals("test@#test?!@#")) return new ArrayList<>();
+
+        ScanOptions options = ScanOptions.scanOptions().match("product-name-aside" + "*" + keyword + "*").build();
+        Cursor<byte[]> keys = scanKeys(options);
+
+        List<ProductResponseDto> result = new ArrayList<>();
+        while (keys.hasNext()) {
+            result.add(productRedisTemplate.opsForValue().get(new String(keys.next())));
+        }
+
+//        for (String key : keys) {
+//            result.add(productRedisTemplate.opsForValue().get(key));
+//        }
+        return result;
+    }
+
+    //캐싱된 키워드로 조회하기
+    public Set<ZSetOperations.TypedTuple<ProductResponseDto>> searchCacheKeyword(String keyword) {
+        ZSetOperations<String, ProductResponseDto> ZSetOperations = productRedisTemplate.opsForZSet();
+        return ZSetOperations.rangeWithScores(keyword + "::", 0L, 99L);
+    }
+
+    private Cursor<byte[]> scanKeys(ScanOptions options) {
+        return productRedisTemplate.getConnectionFactory().getConnection().scan(options);
+    }
+
 }

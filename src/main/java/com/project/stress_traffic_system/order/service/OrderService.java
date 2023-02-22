@@ -60,6 +60,9 @@ public class OrderService {
 
         deleteCartItem(cart, product); //장바구니에서 주문상품 삭제한다
 
+        //주문 수량만큼 재고 차감.
+        product.removeStock(requestDto.getQuantity());
+
         //주문내역 반환 (주문번호와, 주문일자)
         return OrderDto.builder()
                 .orderId(savedOrders.getId())
@@ -169,13 +172,20 @@ public class OrderService {
 
     //상품이 존재하는지 확인
     private Product checkProduct(OrderRequestDto requestDto) {
-        return productRepository.findById(requestDto.getProductId()).orElseThrow(
-                () -> new IllegalArgumentException("상품이 존재하지 않습니다")
-        );
+        return productRepository.findByIdWithPessimisticLock(requestDto.getProductId());
+//      return productRepository.findById(requestDto.getProductId()).orElseThrow(
+//                () -> new IllegalArgumentException("상품이 존재하지 않습니다")
+//        );
     }
 
     //재고수량 확인하기
-    private void checkStock(OrderRequestDto orderRequestDto, Product product) {
+    public void checkStock(OrderRequestDto orderRequestDto, Product product) {
+        if (orderRequestDto == null) {
+            throw new IllegalArgumentException("주문 정보가 존재하지 않습니다.");
+        }
+        if (product == null) {
+            throw new IllegalArgumentException("상품 정보가 존재하지 않습니다.");
+        }
         if (orderRequestDto.getQuantity() > product.getStock()) {
             throw new IllegalArgumentException("주문 가능 수량을 초과하였습니다");
         }
@@ -194,5 +204,13 @@ public class OrderService {
         if (cartItem.isPresent()) {
             cartItemRepository.deleteByCartAndProduct(cart, product);
         }
+    }
+
+    @Transactional
+    public void decrease(Long id, int quantity) {
+        Product product = productRepository.findByIdWithPessimisticLock(id);
+        product.removeStock(quantity);
+        productRepository.save(product);
+
     }
 }

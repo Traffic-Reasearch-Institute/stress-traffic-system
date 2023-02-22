@@ -4,6 +4,7 @@ import com.project.stress_traffic_system.cart.model.Cart;
 import com.project.stress_traffic_system.cart.repository.CartRepository;
 import com.project.stress_traffic_system.jwt.JwtUtil;
 import com.project.stress_traffic_system.members.dto.LoginRequestDto;
+import com.project.stress_traffic_system.members.dto.MembersCheckRequestMsgDto;
 import com.project.stress_traffic_system.members.dto.SignupRequestDto;
 import com.project.stress_traffic_system.members.dto.MembersResponseMsgDto;
 import com.project.stress_traffic_system.members.entity.Members;
@@ -28,17 +29,6 @@ public class MembersService {
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
 
-//    @PostConstruct
-    public void init() {
-        Members members1 = new Members("test1", "11", "서울시", MembersRoleEnum.MEMBER);
-        Members members2 = new Members("test2", "11", "안양시", MembersRoleEnum.MEMBER);
-        Members members3 = new Members("test3", "11", "김해시", MembersRoleEnum.MEMBER);
-
-        membersRepository.save(members1);
-        membersRepository.save(members2);
-        membersRepository.save(members3);
-    }
-
     //클라이언트 상태코드 수정을 위해 사용함
     public void membersExceptionHandler(HttpServletResponse response, int statusCode) {
         //setStatus를 통해 response의 상태 코드 set
@@ -57,7 +47,8 @@ public class MembersService {
     public MembersResponseMsgDto signup(SignupRequestDto membersRequestDto, HttpServletResponse response) {
         String username = membersRequestDto.getUsername();
         String password = passwordEncoder.encode(membersRequestDto.getPassword());
-        String address = membersRequestDto.getAddress();
+        String email = membersRequestDto.getEmail();
+        String nickname = membersRequestDto.getNickname();
 
         //회원 중복 확인
         Optional<Members> found = membersRepository.findByUsername(username);
@@ -77,7 +68,7 @@ public class MembersService {
 
         MembersRoleEnum role = MembersRoleEnum.MEMBER;
 
-        Members members = new Members(username, password, address, role);
+        Members members = new Members(username, password, email, nickname, role);
         Members savedMember = membersRepository.save(members);
 
         Cart cart = new Cart(savedMember);
@@ -86,6 +77,7 @@ public class MembersService {
         return handleMemberException("회원가입 성공", HttpStatus.OK, response);
     }
 
+    @Transactional(readOnly = true) //클라이언트 뒤로가기로 인한 버그발생 방지
     public MembersResponseMsgDto login(LoginRequestDto membersRequestDto, HttpServletResponse response) {
         String username = membersRequestDto.getUsername();
         String password = membersRequestDto.getPassword();
@@ -101,8 +93,12 @@ public class MembersService {
 
         response.addHeader(JwtUtil.AUTHORIZATION_HEADER, jwtUtil.createToken(existMember.getUsername(),existMember.getRole()));
 
-
         return handleMemberException("로그인 성공", HttpStatus.OK, response);
+    }
+
+    @Transactional
+    public Boolean checkId(MembersCheckRequestMsgDto membersCheckResponseMsgDto, HttpServletResponse response) {
+        return membersRepository.existsByUsername(membersCheckResponseMsgDto.getUsername());
     }
 
 }

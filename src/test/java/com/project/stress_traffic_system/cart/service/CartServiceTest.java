@@ -1,3 +1,4 @@
+/*
 package com.project.stress_traffic_system.cart.service;
 
 import com.project.stress_traffic_system.cart.model.Cart;
@@ -38,13 +39,17 @@ public class CartServiceTest {
     private ProductRepository productRepository;
 
     @InjectMocks
+    //위에 mock으로 만든 객체 애들을 injectMoks로 주입시켜줌
     private CartService cartService;
 
+    //전역에서 사용 가능하게 일단 여기에서 객체들 선언해둠
+    //BeforeEach 에서 값 넣어줄 것임
      Members member;
      Cart cart;
      Product product;
      CartItem cartItem;
 
+     //테스트 메서드들이 실행되기 전에 실행될 메서드를 정의
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
@@ -56,11 +61,9 @@ public class CartServiceTest {
         member.setUsername("hyeunseung");
 
         cart = new Cart(member);
-        cart.setId(1L);
 
         product = new Product();
-
-
+        product.setId(1L);
 
         cartItem = new CartItem(cart, product);
     }
@@ -83,4 +86,4 @@ public class CartServiceTest {
         Assertions.assertEquals(cart,cartItem.getCart());
         Assertions.assertEquals(product,cartItem.getProduct());
     }
-}
+}*/

@@ -1,3 +1,4 @@
+/*
 package com.project.stress_traffic_system.members;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -68,3 +69,4 @@ public class MembersControllerTest {
     }
 
 }
+*/

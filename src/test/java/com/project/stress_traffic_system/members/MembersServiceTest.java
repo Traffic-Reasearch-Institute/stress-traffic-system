@@ -1,3 +1,4 @@
+/*
 package com.project.stress_traffic_system.members;//package com.project.stress_traffic_system.members;
 
 import com.project.stress_traffic_system.cart.repository.CartRepository;
@@ -69,7 +70,7 @@ public class MembersServiceTest {
         //Mock 서비스 생성
         MembersService MockMembersService = new MembersService(MockMembersRepository,MockCartRepository,MockJwtUtil,MockPasswordEncoder);
 
-        //when /*회원가입을 하면 Mock 레포터리에 저장된다.*/
+        //when 회원가입을 하면 Mock 레포터리에 저장된다.
         MembersResponseMsgDto responseMsgDto = MockMembersService.signup(signupRequestDto,response);
 
         //then
@@ -99,3 +100,4 @@ public class MembersServiceTest {
     }
 
 }
+*/

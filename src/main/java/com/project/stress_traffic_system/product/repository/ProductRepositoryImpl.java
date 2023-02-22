@@ -146,7 +146,6 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom{
                         member.setUsername(userInfo[0].isEmpty() ? UUID.randomUUID().toString() : userInfo[0]);
                         member.setPassword("$2a$10$8aYgCESquxcDpVSMTGHGEOawngL3UncAMpBwcux.Zr4WbpClUYerG");
                         member.setRole(MembersRoleEnum.MEMBER);
-                        member.setAddress(userInfo[3].isEmpty() ? "서울" : userInfo[3]);
                     }
                     members.add(member);
                 }
@@ -448,6 +447,83 @@ public class ProductRepositoryImpl implements ProductRepositoryCustom{
                 .set(product.clickCount, clickCount)
                 .where(product.id.eq(productId))
                 .execute();
+    }
+
+    // 키워드별로 조회수 상위 1000건 조회 - like 검색
+    @Override
+    public List<ProductResponseDto> findByKeyword(String keyword) {
+        return queryFactory
+                .select(new QProductResponseDto(
+                        productFull.id,
+                        productFull.name,
+                        productFull.price,
+                        productFull.description,
+                        productFull.shippingFee,
+                        productFull.imgurl,
+                        productFull.clickCount,
+                        productFull.orderCount,
+                        productFull.stock,
+                        productFull.introduction,
+                        productFull.pages,
+                        productFull.date
+                ))
+                .from(productFull)
+                .where(productFull.name.contains(keyword))
+                .orderBy(productFull.clickCount.desc())
+                .fetch();
+    }
+
+    //full text 검색
+    @Override
+    public List<ProductResponseDto> findByFullKeyword(String keyword) {
+            BooleanBuilder builder = new BooleanBuilder();
+            NumberTemplate booleanTemplate = Expressions.numberTemplate(Double.class,
+                    "function('match',{0},{1})", productFull.name, keyword + "*");
+            builder.and(booleanTemplate.gt(0));
+
+            return queryFactory
+                    .select(new QProductResponseDto(
+                            productFull.id,
+                            productFull.name,
+                            productFull.price,
+                            productFull.description,
+                            productFull.shippingFee,
+                            productFull.imgurl,
+                            productFull.clickCount,
+                            productFull.orderCount,
+                            productFull.stock,
+                            productFull.introduction,
+                            productFull.pages,
+                            productFull.date
+                    ))
+                    .from(productFull)
+                    .where(builder)
+                    .orderBy(productFull.clickCount.desc())
+                    .fetch();
+    }
+
+    //상위 1000건 검색
+    @Override
+    public List<ProductResponseDto> findTop1000() {
+        return queryFactory
+                .select(new QProductResponseDto(
+                        productFull.id,
+                        productFull.name,
+                        productFull.price,
+                        productFull.description,
+                        productFull.shippingFee,
+                        productFull.imgurl,
+                        productFull.clickCount,
+                        productFull.orderCount,
+                        productFull.stock,
+                        productFull.introduction,
+                        productFull.pages,
+                        productFull.date
+                ))
+                .from(productFull)
+                .orderBy(productFull.clickCount.desc())
+                .limit(1000)
+                .fetch();
     }
 
     private BooleanExpression nameLike(String name) {

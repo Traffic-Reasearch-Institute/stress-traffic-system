@@ -71,4 +71,11 @@ public class Product {
             return (int) (price * ( (100.0 - dc) / 100.0));
         }
     }
+
+
+    //테스트를 위한 생성자 추가
+    public Product(Long id, int stock) {
+        this.id = id;
+        this.stock = stock;
+    }
 }
