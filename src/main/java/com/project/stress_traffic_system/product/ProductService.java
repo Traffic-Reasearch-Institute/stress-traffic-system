@@ -1,4 +1,4 @@
-package com.project.stress_traffic_system.product.service;
+package com.project.stress_traffic_system.product;
 
 import com.project.stress_traffic_system.members.entity.Members;
 import com.project.stress_traffic_system.product.model.*;
@@ -6,7 +6,6 @@ import com.project.stress_traffic_system.product.model.dto.*;
 import com.project.stress_traffic_system.product.repository.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.*;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.scheduling.annotation.Scheduled;

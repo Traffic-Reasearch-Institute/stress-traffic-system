@@ -1,4 +1,4 @@
-package com.project.stress_traffic_system.product.service;
+package com.project.stress_traffic_system.product;
 
 import com.project.stress_traffic_system.product.model.Product;
 import com.project.stress_traffic_system.product.model.dto.ProductResponseDto;
@@ -237,7 +237,7 @@ public class ProductRedisService {
 
 //        Set<String> keys = clickCountRedisTemplate.keys("clickCount::*");
 
-        ScanOptions options = ScanOptions.scanOptions().match("clickCount::").build();
+        ScanOptions options = ScanOptions.scanOptions().match("clickCount::*").build();
         Cursor<byte[]> keys = clickCountRedisTemplate.getConnectionFactory().getConnection().scan(options);
 
         log.info("조회수 RDS에 업데이트 실행 시작");
@@ -307,8 +307,6 @@ public class ProductRedisService {
     //redis 에서 상품이름으로 검색하기 - cache aside
     public List<ProductResponseDto> searchProductsByRedisCacheAside(String keyword) {
 //        Set<String> keys = productRedisTemplate.keys("product-name-aside" + "*" + keyword + "*");
-        //테스트일 때는 빈값을 리턴
-        if (keyword.equals("test@#test?!@#")) return new ArrayList<>();
 
         ScanOptions options = ScanOptions.scanOptions().match("product-name-aside" + "*" + keyword + "*").build();
         Cursor<byte[]> keys = scanKeys(options);
