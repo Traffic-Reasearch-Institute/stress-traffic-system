@@ -58,7 +58,7 @@ public class ProductRedisService {
         RedisSerializer valueSerializer = productRedisTemplate.getValueSerializer();
 
         //기존 데이터 삭제 로직(product)
-        ScanOptions options = ScanOptions.scanOptions().match("product::*").build();
+        ScanOptions options = ScanOptions.scanOptions().match("product::*").count(1000).build();
         Cursor<byte[]> keys = scanKeys(options);
 
         while (keys.hasNext()) {
@@ -66,7 +66,7 @@ public class ProductRedisService {
         }
 
         //기존 데이터 삭제 로직(clickCount)
-        ScanOptions options2 = ScanOptions.scanOptions().match("clickCount::*").build();
+        ScanOptions options2 = ScanOptions.scanOptions().match("clickCount::*").count(1000).build();
         Cursor<byte[]> keys2 = scanKeys(options2);
 
         while (keys2.hasNext()) {
@@ -112,7 +112,7 @@ public class ProductRedisService {
         RedisSerializer valueSerializer = productRedisTemplate.getValueSerializer();
 
         //기존 데이터 삭제 로직
-        ScanOptions options = ScanOptions.scanOptions().match("product-name::*").build();
+        ScanOptions options = ScanOptions.scanOptions().match("product-name::*").count(1000).build();
         Cursor<byte[]> keys = scanKeys(options);
 
         while (keys.hasNext()) {
@@ -237,7 +237,7 @@ public class ProductRedisService {
 
 //        Set<String> keys = clickCountRedisTemplate.keys("clickCount::*");
 
-        ScanOptions options = ScanOptions.scanOptions().match("clickCount::*").build();
+        ScanOptions options = ScanOptions.scanOptions().match("clickCount::*").count(1000).build();
         Cursor<byte[]> keys = clickCountRedisTemplate.getConnectionFactory().getConnection().scan(options);
 
         log.info("조회수 RDS에 업데이트 실행 시작");
@@ -291,7 +291,7 @@ public class ProductRedisService {
 
 //        Set<String> keys = productRedisTemplate.keys("product-name" + "*" + keyword + "*");
 
-        ScanOptions options = ScanOptions.scanOptions().match("product-name" + "*" + keyword + "*").count(1500).build();
+        ScanOptions options = ScanOptions.scanOptions().match("product-name" + "*" + keyword + "*").count(1000).build();
         Cursor<byte[]> keys = scanKeys(options);
 
         List<ProductResponseDto> result = new ArrayList<>();
@@ -308,7 +308,7 @@ public class ProductRedisService {
     public List<ProductResponseDto> searchProductsByRedisCacheAside(String keyword) {
 //        Set<String> keys = productRedisTemplate.keys("product-name-aside" + "*" + keyword + "*");
 
-        ScanOptions options = ScanOptions.scanOptions().match("product-name-aside" + "*" + keyword + "*").build();
+        ScanOptions options = ScanOptions.scanOptions().match("product-name-aside" + "*" + keyword + "*").count(1000).build();
         Cursor<byte[]> keys = scanKeys(options);
 
         List<ProductResponseDto> result = new ArrayList<>();
