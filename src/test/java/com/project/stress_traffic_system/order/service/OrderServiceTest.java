@@ -254,53 +254,6 @@ class OrderServiceTest {
             //then
             Assertions.assertDoesNotThrow(() -> orderService.checkStock(orderRequestDto, product));
         }
-    }
-
-
-    @Nested
-    @DisplayName("실패 케이스")
-    class failCase {
-        @Test
-        @DisplayName("checkStock - orderRequestDto가 null일 때")
-        void checkStockFail1() {
-            //given
-            OrderService orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartRepository
-                    , redissonClient, redisCacheManager,productRedisTemplate);
-            OrderRequestDto orderRequestDto = null;
-            //when
-
-            //then
-            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> orderService.checkStock(orderRequestDto, product));
-            assertEquals("주문 정보가 존재하지 않습니다.", exception.getMessage());
-        }
-
-        @Test
-        @DisplayName("checkStock - product가 null일 때")
-        void checkStockFail2() {
-            //given
-            OrderService orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartRepository
-                    , redissonClient, redisCacheManager,productRedisTemplate);
-            Product product = null;
-            //when
-
-            //then
-            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> orderService.checkStock(orderRequestDto, product));
-            assertEquals("상품 정보가 존재하지 않습니다.", exception.getMessage());
-        }
-
-        @Test
-        @DisplayName("checkStock - 주문 수량이 재고보다 많을 때")
-        void checkStockFail() {
-            //given
-            OrderService orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartRepository
-                    ,redissonClient, redisCacheManager,productRedisTemplate);
-            orderRequestDto.setQuantity(100);
-            //when
-
-            //then
-            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> orderService.checkStock(orderRequestDto, product));
-            assertEquals("주문 가능 수량을 초과하였습니다", exception.getMessage());
-        }
 
         @Test
         @DisplayName("여러상품 주문하기 - redissonLock")
@@ -348,6 +301,17 @@ class OrderServiceTest {
         }
 
         @Test
+        @DisplayName("단일상품 주문하기 - PessimisticLock")
+        @Transactional
+        void orderOneWithPessimisticLock() {
+            //when
+            OrderDto orderDto = orderService.orderOneWithPessimisticLock(member,orderRequestDto);
+
+            //then
+            assertNotNull(orderDto);
+        }
+
+        @Test
         @DisplayName("캐시상품 찾기 (캐시미스)")
         @Transactional
         void findProductInCache() {
@@ -374,6 +338,54 @@ class OrderServiceTest {
 
             //then
             assertEquals(responseDto.getName(),productDto.getName());
+        }
+
+    }
+
+
+    @Nested
+    @DisplayName("실패 케이스")
+    class failCase {
+        @Test
+        @DisplayName("checkStock - orderRequestDto가 null일 때")
+        void checkStockFail1() {
+            //given
+            OrderService orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartRepository
+                    , redissonClient, redisCacheManager,productRedisTemplate);
+            OrderRequestDto orderRequestDto = null;
+            //when
+
+            //then
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> orderService.checkStock(orderRequestDto, product));
+            assertEquals("주문 정보가 존재하지 않습니다.", exception.getMessage());
+        }
+
+        @Test
+        @DisplayName("checkStock - product가 null일 때")
+        void checkStockFail2() {
+            //given
+            OrderService orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartRepository
+                    , redissonClient, redisCacheManager,productRedisTemplate);
+            Product product = null;
+            //when
+
+            //then
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> orderService.checkStock(orderRequestDto, product));
+            assertEquals("상품 정보가 존재하지 않습니다.", exception.getMessage());
+        }
+
+        @Test
+        @DisplayName("checkStock - 주문 수량이 재고보다 많을 때")
+        void checkStockFail() {
+            //given
+            OrderService orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartRepository
+                    ,redissonClient, redisCacheManager,productRedisTemplate);
+            orderRequestDto.setQuantity(100);
+            //when
+
+            //then
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> orderService.checkStock(orderRequestDto, product));
+            assertEquals("주문 가능 수량을 초과하였습니다", exception.getMessage());
         }
 
     }
