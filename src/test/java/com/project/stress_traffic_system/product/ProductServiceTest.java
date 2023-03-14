@@ -1,4 +1,4 @@
-package com.project.stress_traffic_system.product.service;
+package com.project.stress_traffic_system.product;
 
 import com.project.stress_traffic_system.config.TestConfig;
 import com.project.stress_traffic_system.members.entity.Members;
@@ -14,7 +14,6 @@ import com.project.stress_traffic_system.product.repository.CategoryRepository;
 import com.project.stress_traffic_system.product.repository.ProductRepository;
 import com.project.stress_traffic_system.product.repository.ReviewRepository;
 import com.project.stress_traffic_system.product.repository.SubCategoryRepository;
-
 import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberTemplate;
@@ -27,17 +26,18 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.data.redis.core.ZSetOperations;
+import org.springframework.data.redis.core.*;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
-import java.util.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 import static com.project.stress_traffic_system.product.model.QProductFull.productFull;
 import static org.mockito.ArgumentMatchers.any;
@@ -46,12 +46,23 @@ import static org.mockito.Mockito.*;
 @SpringBootTest //레디스 도커를 띄우기 위해 통합테스트로 진행
 @ExtendWith(MockitoExtension.class) //Mock객체 생성
 @Import(TestConfig.class) //JPAQueryFactory 사용
+//@RequiredArgsConstructor
 public class ProductServiceTest {
 
     //TestConfig에 em과 JPAQueryFactory를 Bean으로 등록
     @Autowired private JPAQueryFactory queryFactory;
     //실제 캐시를 불러올 RedisTemplate
     @Autowired private RedisTemplate<String, ProductResponseDto> AutowiredProductRedisTemplate;
+    @Autowired private RedisTemplate<String, String> AutowiredClickCountRedisTemplate;
+    @Autowired ProductRedisService AutowiredProductRedisService;
+    @Autowired ProductService AutowiredProductService;
+    //ProductService에 필요한 생성자 매개변수
+    @Autowired private ProductRepository AutowiredproductRepository;
+    @Autowired private ReviewRepository AutowiredreviewRepository;
+    @Autowired private CategoryRepository AutowiredcategoryRepository;
+    @Autowired private SubCategoryRepository AutowiredsubCategoryRepository;
+
+    @CreatedDate private LocalDateTime date;
 
     //ProductService에 필요한 생성자 매개변수
     @Mock private ProductRepository productRepository;
@@ -76,18 +87,16 @@ public class ProductServiceTest {
     @InjectMocks
     ProductService productService;
 
-    @Autowired
-    ProductService AutowiredProductService;
-
     //테스트에 반복되는 변수를 전역변수로 선언
     Integer page = 0;
     ProductResponseDto redisProductDto = ProductResponseDto.builder().id(1L).imgurl(20).name("Robbie").build();
 
 
-    //테스트를 실행하기 전마다 Mock Service 생성
+    //테스트를 실행하기 전마다 Service 생성
     @BeforeEach
     void beforeEach(){
-
+        AutowiredProductRedisService = new ProductRedisService(productRepository,AutowiredProductRedisTemplate,AutowiredClickCountRedisTemplate);
+        AutowiredProductService = new ProductService(AutowiredreviewRepository,AutowiredproductRepository,AutowiredcategoryRepository,AutowiredsubCategoryRepository,AutowiredProductRedisService);
         productRedisService = new ProductRedisService(productRepository,productRedisTemplate,clickCountRedisTemplate);
         productService = new ProductService(reviewRepository,productRepository,categoryRepository,subCategoryRepository,productRedisService);
     }
@@ -136,7 +145,7 @@ public class ProductServiceTest {
         }
 
 
-        @DisplayName("getProduct(productId) 메서드 테스트")
+        @DisplayName("getProduct(productId) 메서드 테스트 - 상품정보 있음")
         @Test
         void getProduct() throws IOException {
             //given
@@ -155,6 +164,33 @@ public class ProductServiceTest {
             Assertions.assertEquals(redisProductDto, productResponse);
         }
 
+        @DisplayName("getProduct(productId) 메서드 테스트 - 상품정보 없음")
+        @Test
+        void getProduct2() throws IOException {
+            //given
+            redisProductDto = ProductResponseDto.builder()
+                    .id(1L).name("Victor").price(1000)
+                    .description("des").shippingFee(2500)
+                    .imgurl(30).clickCount(100L)
+                    .orderCount(100L).stock(100)
+                    .introduction("int").pages(100)
+                    .date(date).build();
+
+            Product product = new Product(redisProductDto);
+            when(productRedisTemplate.opsForValue()).thenReturn(ProductValueOperation);
+            when(ProductValueOperation.get(any())).thenReturn(null);
+            when(productRepository.findById(any())).thenReturn(Optional.of(product));
+            //productRedisService.addClickCount()에 필요한 key&value 커스텀
+            when(clickCountRedisTemplate.opsForValue()).thenReturn(ClickValueOperation);
+            when(ClickValueOperation.get(any())).thenReturn("100"); //clickCount 10 리턴
+
+            //when
+            ProductResponseDto productResponse = productService.getProduct(1L);
+
+            //then
+            Assertions.assertEquals(productResponse.getClickCount().longValue(), product.getClickCount());
+            Assertions.assertEquals(product.getName(), productResponse.getName());
+        }
 
         @DisplayName("Like 검색")
         @Test
@@ -240,6 +276,7 @@ public class ProductServiceTest {
 
 
         @DisplayName("redis 상품검색")
+        @Transactional
         @Test
         void searchProductsByRedis() {
             //given
@@ -249,27 +286,9 @@ public class ProductServiceTest {
             //when
             List<ProductResponseDto> productResponse = AutowiredProductService.searchProductsByRedis("test");
 
+            System.out.println("productResponse.get(0).getName()"+productResponse.get(0).getName());
             //then
             Assertions.assertTrue(productResponse.get(0).getName().equals("test"));
-        }
-
-        @DisplayName("redis 검색 - cache aside / 해당 상품이 캐시에 없을 경우")
-        @Test
-        void searchProductsByRedisCacheAside() {
-            //given
-            //findByFullKeyword()에 반환할 리턴값
-            List<ProductResponseDto> content = new ArrayList<>();
-            content.add(redisProductDto);
-
-            //searchProductsByRedisCacheAside() 메서드에 키를 빈 값으로 반환
-            when(productRepository.findByFullKeyword("test@#test?!@#")).thenReturn(content);
-
-            //when
-            List<ProductResponseDto> productResponse = productService.searchProductsByRedisCacheAside("test@#test?!@#");
-
-            //then
-            Assertions.assertTrue(productResponse.get(0).getName().contains("Robbie"));
-            Assertions.assertEquals(content.size(), productResponse.size());
         }
 
         @DisplayName("캐싱 키워드 20가지로 검색하기")
@@ -391,6 +410,105 @@ public class ProductServiceTest {
             //then
             Assertions.assertEquals(responseDtos.get(0).getContent(),"It's cool");
             Assertions.assertEquals(responseDtos.get(0).getUsername(),"user");
+        }
+
+        @DisplayName("상품 상세페이지 조회를 위한 조회수 상위 1만건 캐싱")
+        @Test
+        @Transactional
+        void cacheProductsDetail() {
+            //when
+            AutowiredProductService.cacheProductsDetail();
+
+            //then
+            ScanOptions options = ScanOptions.scanOptions().match("product::*").count(1000).build();
+            Cursor<byte[]> keys = AutowiredProductRedisTemplate.getConnectionFactory().getConnection().scan(options);
+            int count=0;
+            while (keys.hasNext()) {
+                keys.next();
+                count++;
+            }
+            Assertions.assertEquals(count,10000);
+        }
+
+        @DisplayName("Redis에 있는 상품 조회수를 주기적으로 DB에 업데이트")
+        @Test
+        @Transactional
+        void updateClickCount() {
+            //given
+            //테스트를 위해 임의값을 저장
+            ValueOperations<String, String> valueOperations = AutowiredClickCountRedisTemplate.opsForValue();
+            valueOperations.set("clickCount::1","100");
+
+            RedisConnectionFactory connectionFactory = AutowiredClickCountRedisTemplate.getConnectionFactory();
+            when(clickCountRedisTemplate.getConnectionFactory()).thenReturn(connectionFactory);
+            when(clickCountRedisTemplate.opsForValue()).thenReturn(valueOperations);
+
+            //when
+            productRedisService.updateClickCount();
+
+            //then
+            verify(productRepository, times(1)).setClickCount(any(Long.class),any(Long.class));
+            verify(clickCountRedisTemplate, times(1)).delete(any(String.class));
+        }
+
+        @DisplayName("상품이름으로 검색하기 위한 캐싱데이터(1000건)")
+        @Test
+        @Transactional
+        void cacheProductsTop1000() {
+            //when
+            AutowiredProductService.cacheProductsTop1000();
+
+            //then
+            ScanOptions options = ScanOptions.scanOptions().match("product-name::*").count(500).build();
+            Cursor<byte[]> keys = AutowiredProductRedisTemplate.getConnectionFactory().getConnection().scan(options);
+            int count=0;
+            while (keys.hasNext()) {
+                keys.next();
+                count++;
+            }
+            Assertions.assertEquals(count,1000);
+        }
+
+        @DisplayName("redis 에서 상품이름으로 검색하기 - cache aside")
+        @Test
+        @Transactional
+        void searchProductsByRedisCacheAside() {
+            //given
+            ValueOperations<String, ProductResponseDto> valueOperations = AutowiredProductRedisTemplate.opsForValue();
+            valueOperations.set("product-name-aside::test",redisProductDto);
+
+            //when
+            List<ProductResponseDto> responseDtos = AutowiredProductService.searchProductsByRedisCacheAside("test");
+
+            //then
+            Assertions.assertEquals(responseDtos.get(0).getName(),"Robbie");
+        }
+
+        @DisplayName("키워드별로 조회수 상위 100건 캐싱")
+        @Test
+        @Transactional
+        void cacheProductsByKeyword() {
+            //given
+            List<ProductResponseDto> responseDtos = new ArrayList<>();
+            responseDtos.add(redisProductDto);
+            when(productRepository.findByFullKeyword(any())).thenReturn(responseDtos);
+
+            //when
+            productService.cacheProductsByKeyword();
+
+            //then
+            verify(productRepository, times(20)).findByFullKeyword(any(String.class));
+        }
+
+        @DisplayName("카테고리별로(대분류) 상위 1만건 캐싱하기")
+        @Test
+        @Transactional
+        void cacheProducts() {
+            //when
+            productService.cacheProducts();
+
+            //when
+            verify(productRedisTemplate, times(4)).delete(any(String.class));
         }
 
     }

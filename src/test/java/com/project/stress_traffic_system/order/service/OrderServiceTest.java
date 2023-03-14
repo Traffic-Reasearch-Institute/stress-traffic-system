@@ -25,23 +25,21 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-
+@SpringBootTest
 @ExtendWith(MockitoExtension.class)
 @Slf4j
 @DisplayName("orderService 테스트")
@@ -57,8 +55,6 @@ class OrderServiceTest {
     private ProductRepository productRepository;
 
     @Mock
-    private MembersRepository membersRepository;
-    @Mock
     private CartItemRepository cartItemRepository;
 
     @Mock
@@ -70,13 +66,14 @@ class OrderServiceTest {
     @Mock
     private RedisTemplate<String, ProductResponseDto> productRedisTemplate;
 
+    @Autowired private OrderService orderService;
+
     Members member;
     Cart cart;
 
     Product product;
     CartItem cartItem;
     OrderRequestDto orderRequestDto;
-
 
     @BeforeEach
     void beforeEach() {
@@ -87,7 +84,7 @@ class OrderServiceTest {
         cartItem = new CartItem(cart, product);
 
         orderRequestDto = new OrderRequestDto();
-        orderRequestDto.setProductId(1L);
+        orderRequestDto.setProductId(2L);
         orderRequestDto.setQuantity(10);
         orderRequestDto.setDiscount(1000F);
         orderRequestDto.setDcType("none");
@@ -293,7 +290,7 @@ class OrderServiceTest {
 
         @Test
         @DisplayName("checkStock - 주문 수량이 재고보다 많을 때")
-        void checkStockFail3() {
+        void checkStockFail() {
             //given
             OrderService orderService = new OrderService(orderRepository, productRepository, cartItemRepository, cartRepository
                     ,redissonClient, redisCacheManager,productRedisTemplate);
@@ -304,5 +301,81 @@ class OrderServiceTest {
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> orderService.checkStock(orderRequestDto, product));
             assertEquals("주문 가능 수량을 초과하였습니다", exception.getMessage());
         }
+
+        @Test
+        @DisplayName("여러상품 주문하기 - redissonLock")
+        @Transactional
+        void orderManyWithRedissonLock() {
+            //given
+            List<OrderRequestDto> orderRequestDtos = new ArrayList<>();
+            orderRequestDtos.add(orderRequestDto);
+
+            //when
+            OrderDto orderDto = orderService.orderManyWithRedissonLock(member,orderRequestDtos);
+
+            //then
+            assertNotNull(orderDto);
+        }
+
+        @Test
+        @DisplayName("여러상품 주문하기")
+        @Transactional
+        void orderMany() {
+            //given
+            List<OrderRequestDto> orderRequestDtos = new ArrayList<>();
+            orderRequestDtos.add(orderRequestDto);
+
+            //when
+            OrderDto orderDto = orderService.orderMany(member,orderRequestDtos);
+
+            //then
+            assertNotNull(orderDto);
+        }
+
+        @Test
+        @DisplayName("여러상품 주문하기 - PessimisticLock")
+        @Transactional
+        void orderManyWithPessimisticLock() {
+            //given
+            List<OrderRequestDto> orderRequestDtos = new ArrayList<>();
+            orderRequestDtos.add(orderRequestDto);
+
+            //when
+            OrderDto orderDto = orderService.orderManyWithPessimisticLock(member,orderRequestDtos);
+
+            //then
+            assertNotNull(orderDto);
+        }
+
+        @Test
+        @DisplayName("캐시상품 찾기 (캐시미스)")
+        @Transactional
+        void findProductInCache() {
+            //given
+            List<OrderRequestDto> orderRequestDtos = new ArrayList<>();
+            orderRequestDtos.add(orderRequestDto);
+
+            //when
+            ProductResponseDto responseDto = orderService.findProductInCache(1L,"test123");
+
+            //then
+            assertEquals(responseDto.getName(),"test");
+        }
+
+        @Test
+        @DisplayName("캐시저장하기")
+        @Transactional
+        void saveProductInCache() {
+            //given
+            ProductResponseDto productDto = ProductResponseDto.builder().id(1L).imgurl(20).name("Robbie").build();
+
+            //when
+            ProductResponseDto responseDto = orderService.saveProductInCache(productDto);
+
+            //then
+            assertEquals(responseDto.getName(),productDto.getName());
+        }
+
     }
+
 }
